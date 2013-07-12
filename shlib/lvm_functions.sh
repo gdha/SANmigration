@@ -4,11 +4,17 @@
 function _convert_lvmtab_to_ascii
 {
 	if [[ -f /etc/lvmtab ]]; then
+		# LVM 1
 		_note "Saved /etc/lvmtab as $TMPDIR/lvmtab.out"
 		strings /etc/lvmtab > $TMPDIR/lvmtab.out
-	else
-		_error "File /etc/lvmtab not present. Nothing to do."
 	fi
+	if [[ -f /etc/lvmtab_p ]]; then
+		# LVM 2
+		_note "Saved /etc/lvmtab_p as $TMPDIR/lvmtab.out"
+		strings /etc/lvmtab_p >> $TMPDIR/lvmtab.out
+	fi
+	[[ ! -f /etc/lvmtab ]] && [[ ! -f /etc/lvmtab_p ]] && \
+		_error "File /etc/lvmtab[_p] not present. Nothing to do."
 }
 
 function _save_lvmpvg
