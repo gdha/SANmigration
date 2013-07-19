@@ -270,18 +270,19 @@ function _add_vgcreate_vgs_to_script
 		count=$((count-1))		# as we 0 too
 		# VGarray[0]="vg=vgname"	VGarray[1]="majnr"	VGarray[2]="minnr"
 		# VGarray[3]="max_lv"		VGarray[4]="pe_size"	VGarray[5]="max_pv"
-		# VGarray[6]="max_pe"		VGarray[7]="pvg_name"	VGarray[8]="disk"
-		# VGarray[9]="pvg_name"		VGarray[10]="disk"	...
+		# VGarray[6]="max_pe"		VGarray[7]="vg_ver"     VGarray[8]="vg_maxsize"
+		# VGarray[9]="pvg_name"    	VGarray[10]="disk"
+		# VGarray[11]="pvg_name"	VGarray[12]="disk"	...
 		vgname=${VGarray[0]##*=}	# remove vg=
 		_note "######## $vgname #########"
 		_add_mkdir_line $vgname
 		_add_mknod_line $vgname ${VGarray[1]} ${VGarray[2]}
-		_add_check_unique_vg_minornr ${VGarray[2]}
-		old_rdisk="/dev/r"${VGarray[8]#/dev/*} # convert block to raw device
+		_add_check_unique_vg_minornr ${VGarray[2]} ${VGarray[1]} # minnr majnr
+		old_rdisk="/dev/r"${VGarray[10]#/dev/*} # convert block to raw device
 		new_rdisk=$(_find_corresponding_new_disk $old_rdisk)	# via diskmap file
 		[[ ! -c $new_rdisk ]] && _error "Device $new_rdisk not found on system $HOSTNAME"
-		_add_vgcreate_line $vgname ${VGarray[3]} ${VGarray[4]} ${VGarray[5]} ${VGarray[6]} ${VGarray[7]} $(_disk_name ${new_rdisk})
-		j=9
+		_add_vgcreate_line $vgname ${VGarray[3]} ${VGarray[4]} ${VGarray[5]} ${VGarray[6]} ${VGarray[1]} ${VGarray[7]} ${VGarray[8]} ${VGarray[9]} $(_disk_name ${new_rdisk})
+		j=11
 		while [ $j -le $count ];
 		do
 			pvg_name=${VGarray[j]}	# odd nr
@@ -342,10 +343,10 @@ function _add_mknod_line
 
 function _add_check_unique_vg_minornr
 {
-	# input arg1: minornr
+	# input arg1: minornr arg2: majornr
 	cat - >> $SCRIPT <<-EOD
-	# check if minornr is unique
-	[[ \$(ls -l /dev/*/group | grep "$1" | wc -l) -ne 1 ]] && _error "Sorry, the VG minor nr ($1) is not unique"
+	# check if minornr is unique for the according LVMtype (majornr 64 or 128)
+	[[ \$(ls -l /dev/*/group | grep "$1" | grep "$2 " | wc -l) -ne 1 ]] && _error "Sorry, the VG minor nr ($1) is not unique"
 
 	EOD
 }
@@ -353,18 +354,36 @@ function _add_check_unique_vg_minornr
 function _add_vgcreate_line
 {
 	# input arg1:vgname, arg2:"max_lv", arg3:"pe_size", arg4:"max_pv", arg5:"max_pe"
-	# input arg6:"pvg_name" arg7:"disk"
-	# note arg6 contains "PVG:" when no PVG is needed, or "PVG:pvg_name"
+	# input arg6:"majnr", arg7:"vg_ver", arg8:"vg_maxsize", arg9:"pvg_name" arg10:"disk"
+	# note arg9 contains "PVG:" when no PVG is needed, or "PVG:pvg_name"
 	typeset pvg_name
-	pvg_name=${6##*:}
+	pvg_name=${9##*:}
 	[[ ! -z "$pvg_name" ]] && opts="-g $pvg_name" || opts=""
-	_note "Adding vgcreate line (vgcreate -l $2 -s $3 -p $4 -e $5 $opts $1 $7)"
+        # verify if we are dealing with LVM 2 VG (arg6)
+        LVMtype=""   # default LVM 1.0
+        if [[ $6 -eq 128 ]]; then
+
+	# LVMtype -V 2
+	_note "Adding vgcreate line (vgcreate -V $7 -S $8 -s $3 $opts $1 ${10}"
 	cat - >> $SCRIPT <<-EOD
-	_note "vgcreate -l $2 -s $3 -p $4 -e $5 $opts $1 $7"
-	vgcreate -l $2 -s $3 -p $4 -e $5 $opts $1 $7
+	_note "vgcreate -V $7 -S $8 -s $3 $opts $1 ${10}"
+	vgcreate -V $7 -S $8 -s $3 $opts $1 ${10}
 	_check_rc \$? "vgcreate of $1 failed. Do you want to continue"
 
 	EOD
+
+        else
+
+	# LVMtype 1
+	_note "Adding vgcreate line (vgcreate -l $2 -s $3 -p $4 -e $5 $opts $1 ${10}"
+	cat - >> $SCRIPT <<-EOD
+	_note "vgcreate -l $2 -s $3 -p $4 -e $5 $opts $1 ${10}"
+	vgcreate  -l $2 -s $3 -p $4 -e $5 $opts $1 ${10}
+	_check_rc \$? "vgcreate of $1 failed. Do you want to continue"
+
+	EOD
+
+	fi
 }
 
 function _add_vgextend_line

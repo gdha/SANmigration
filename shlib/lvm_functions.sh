@@ -55,7 +55,7 @@ function _collect_vginfo
 {
 	cat - >> $SANCONF <<-EOD
 	# Syntax:
-	# vg=/dev/vg_name;VGmajornr;VGminornr;max_lv;pe_size;max_pv;max_pe;PVG:[name];/dev/disk/disk1;PVG:[name];/dev/disk/disk2
+	# vg=/dev/vg_name;VGmajornr;VGminornr;max_lv;pe_size;max_pv;max_pe;vg_ver;vg_maxsize;PVG:[name];/dev/disk/disk1;PVG:[name];/dev/disk/disk2
 	EOD
 	for vgname in $(vgdisplay 2>/dev/null |grep "^VG Name"|grep -v vg00|awk '{print $3}')
 	do
@@ -71,6 +71,8 @@ function _collect_vginfo
 		pe_size=$(grep "^PE Size" $TMPfile | cut -c20- | awk '{print $1}')
 		max_pv=$(grep "^Max PV" $TMPfile   | cut -c20- | awk '{print $1}')
 		max_pe=$(grep "^Max PE" $TMPfile   | cut -c20- | awk '{print $1}')
+		vg_ver=$(grep "^VG Version" $TMPfile | cut -c20- | awk '{print $1}')
+		vg_maxsize=$(grep "^VG Max Size" $TMPfile | cut -c20- | awk '{print $1}')
 		# now we need to build the disk list including PVG names (if any)
 		disklist=""
 		# write the PVG part to a file (exec once per VGname)
@@ -82,7 +84,7 @@ function _collect_vginfo
 			disklist="${disklist};PVG:${pvg_name};$disk"
 		done
 
-		echo "vg=${vgname};${VGmajornr};${VGminornr};${max_lv};${pe_size};${max_pv};${max_pe}${disklist}" >> $SANCONF
+		echo "vg=${vgname};${VGmajornr};${VGminornr};${max_lv};${pe_size};${max_pv};${max_pe};${vg_ver};${vg_maxsize}${disklist}" >> $SANCONF
 	done
 }
 
