@@ -171,7 +171,10 @@ function _find_similar_sized_disk
 	while [ $i -lt  $count ]
 	do
 		_debug "i=$i odisk=$odisk odisk_size=$odisk_size bdown=$bdown ndisk[$i]=${ndisk[i]} ndisk_size[$i]=${ndisk_size[i]} bup=$bup"
-		if [ ${ndisk_size[i]} -ge $bdown ] && [ ${ndisk_size[i]} -le $bup ]; then
+		if [[ ${ndisk_size[i]} -ge $bup ]]; then
+			new_disk=${ndisk[i]}
+			break # escape from while loop
+		elif [ ${ndisk_size[i]} -ge $bdown ] && [ ${ndisk_size[i]} -le $bup ]; then
 			# $bdown <= $ndisk_size <= $bup
 			new_disk=${ndisk[i]}
 			break # escape from while loop

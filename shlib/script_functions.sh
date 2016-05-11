@@ -224,7 +224,7 @@ function _find_corresponding_new_disk
 	# uses the diskmap for it
 	typeset DSKMAP=$TMPDIR/diskmap
 	[[ ! -f $DSKMAP ]] && _error "Need the $DSKMAP file to find corresponding disk"
-	typeset old_disk=$1
+	typeset -l old_disk="$1"
 	new_disk=$(grep "^$old_disk " $DSKMAP | awk '{print $2}')
 	[[ -z "$new_disk" ]] && _error "Did not found a corresponding disk for $old_disk"
 	echo $new_disk
@@ -254,18 +254,22 @@ function _add_vgcreate_vgs_to_script
 {
 	typeset -i i j count
 	typeset wd old_rdisk new_rdisk
-
 	# will add lines to SCRIPT to vgcreate our VGs found in SANCONF
 	for vgline in $(grep "^vg=" $SANCONF)
 	do
 		set -A VGarray			# define an empty array
 		i=0	# used to fill array (re-use VGarray for each vg found in SANCONF)
+		OLDIFS="$IFS"
+		IFS=";"
 		# grab all the items from SANCONF for this vgname and stuff it into VGarray
-		for wd in $(echo $vgline | tr ';' '\n') # wd contains word without ;
+		#BUG: for wd in $(echo $vgline | tr ';' '\n') # wd contains word without ;
+		for wd in $vgline # wd contains word without ;
 		do
+			_debug "VGarray[$i]=$wd"
 			VGarray[$i]="$wd"
 			i=$((i+1))
 		done
+		IFS="$OLDIFS"
 		count=${#VGarray[@]}		# amount of values in array
 		count=$((count-1))		# as we 0 too
 		# VGarray[0]="vg=vgname"	VGarray[1]="majnr"	VGarray[2]="minnr"
@@ -278,10 +282,14 @@ function _add_vgcreate_vgs_to_script
 		_add_mkdir_line $vgname
 		_add_mknod_line $vgname ${VGarray[1]} ${VGarray[2]}
 		_add_check_unique_vg_minornr ${VGarray[2]} ${VGarray[1]} # minnr majnr
+		# TODO: use _rdisk_name function
 		old_rdisk="/dev/r"${VGarray[10]#/dev/*} # convert block to raw device
+		#BUG??
+		#old_rdisk=$(_rdisk_name ${VGarray[10]}) # convert block to raw device
 		new_rdisk=$(_find_corresponding_new_disk $old_rdisk)	# via diskmap file
+		new_disk=$(_disk_name ${new_rdisk})
 		[[ ! -c $new_rdisk ]] && _error "Device $new_rdisk not found on system $HOSTNAME"
-		_add_vgcreate_line $vgname ${VGarray[3]} ${VGarray[4]} ${VGarray[5]} ${VGarray[6]} ${VGarray[1]} ${VGarray[7]} ${VGarray[8]} ${VGarray[9]} $(_disk_name ${new_rdisk})
+		 _add_vgcreate_line $vgname "${VGarray[3]}" "${VGarray[4]}" "${VGarray[5]}" "${VGarray[6]}" "${VGarray[1]}" " ${VGarray[7]}" " ${VGarray[8]}" "${VGarray[9]}" "${new_disk}"
 		j=11
 		while [ $j -le $count ];
 		do
@@ -412,13 +420,17 @@ function _add_lvcreate_lv_to_script
 	do
 		set -A LVarray
 		i=0
-		for wd in $(echo $lvline | tr ';' '\n') # wd contains word without ;
+		OLDIFS="$IFS"
+		IFS=";"
+		#for wd in $(echo $lvline | tr ';' '\n') # wd contains word without ;
+		for wd in $lvline # wd contains word without ;
 		do
-
+			_debug "LVarray[$i]=$wd"
 			LVarray[$i]="$wd"
 			i=$((i+1))
 
 		done
+		IFS="$OLDIFS"
 		count=${#LVarray[@]}			# amount of values in array
 		count=$((count-1)) 
 		# LVarray[0]=lv=lvol	LVarray[1]=mirror_copy	LVarray[2]=lv_size
@@ -515,11 +527,16 @@ function _add_mkfs_fs_to_script
 	do
 		set -A FSarray
 		i=0
-		for wd in $(echo $fsline | tr ';' '\n') # wd contains word without ;
+		OLDIFS="$IFS"
+		IFS=";"
+		#for wd in $(echo $fsline | tr ';' '\n') # wd contains word without ;
+		for wd in $fsline # wd contains word without ;
 		do
+			_debug "FSarray[$i]=$wd"
 			FSarray[$i]="$wd"
 			i=$((i+1))
 		done
+		IFS="$OLDIFS"
                 count=${#FSarray[@]}			# amount of values in array
 		count=$((count-1))
 		# FSarray[0]=fs=/fs	FSarray[1]=/dev/vgname/lvol	FSarray[2]=FStype
@@ -601,13 +618,18 @@ function _add_post_config_of_devs_to_script
 
 		set -A PVarray
 		i=0
-		for wd in $(echo $pvline | tr ';' '\n') # wd contains word without ;
+		OLDIFS="$IFS"
+		IFS=";"
+		#pv=/dev/dsk/c14t0d0;/dev/vg01;60;On;SST;8
+		#for wd in $(echo $pvline | tr ';' '\n') # wd contains word without ;
+		for wd in $pvline # wd contains word without ;
 		do
-
+			_debug "PVarray[$i]=$wd"
 			PVarray[$i]="$wd"
 			i=$((i+1))
 
 		done
+		IFS="$OLDIFS"
 		count=${#PVarray[@]}			# amount of values in array
 		count=$((count-1))
 		# PVarray[0]=pv=/dev/disk/disk1		PVarray[1]=vgname	PVarray[2]=io_timeout
